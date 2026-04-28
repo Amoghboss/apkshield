@@ -1,295 +1,299 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowRight, Chrome, Loader2, LockKeyhole, Mail, Shield, AlertTriangle, RefreshCw } from 'lucide-react';
-import { FirebaseError } from 'firebase/app';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-} from 'firebase/auth';
-import { auth, googleProvider } from '../firebase';
+﻿import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { supabase, isSupabaseConfigured } from '../supabase';
 
-interface AuthProps {
-  onAuthenticate: () => void;
-}
-
-type AuthMode = 'signin' | 'signup';
-
-function readableAuthError(error: unknown) {
-  if (!(error instanceof FirebaseError)) {
-    return 'Authentication failed. Please try again.';
+// ── helpers ──────────────────────────────────────────────────────────────────
+function parseError(err: unknown): { msg: string; code: string | null } {
+  if (err instanceof Error) {
+    const code = (err as any).code ?? (err as any).status ?? null;
+    const map: Record<string, string> = {
+      invalid_credentials:   'Wrong email or password.',
+      user_not_found:        'No account found with this email.',
+      email_not_confirmed:   'Check your inbox and confirm your email first.',
+      email_exists:          'An account already exists with this email.',
+      user_already_exists:   'An account already exists with this email.',
+      weak_password:         'Password must be at least 6 characters.',
+      invalid_email:         'Enter a valid email address.',
+      provider_disabled:     'Google sign-in is not enabled yet — see setup below.',
+      provider_not_enabled:  'Google sign-in is not enabled yet — see setup below.',
+    };
+    return { msg: map[code] ?? err.message, code };
   }
-
-  const messages: Record<string, string> = {
-    'auth/invalid-credential': 'Invalid email or password.',
-    'auth/user-not-found': 'No account exists with this email.',
-    'auth/wrong-password': 'Incorrect password.',
-    'auth/email-already-in-use': 'An account already exists with this email.',
-    'auth/weak-password': 'Password should be at least 6 characters.',
-    'auth/invalid-email': 'Enter a valid email address.',
-    'auth/popup-closed-by-user': 'Google sign-in was closed before it finished.',
-    'auth/operation-not-allowed': 'This sign-in method is not enabled in Firebase Authentication.',
-    'auth/network-request-failed': 'Could not reach Firebase Auth. If using the emulator, make sure it is running on port 9099. Otherwise, check your network connection.',
-    'auth/unauthorized-domain': 'Add localhost to Authorized domains in Firebase Authentication settings (Firebase Console → Authentication → Sign-in method).',
-  };
-
-  return messages[error.code] || error.message;
+  return { msg: 'Authentication failed. Please try again.', code: null };
 }
 
-function getErrorCode(error: unknown): string | null {
-  if (error instanceof FirebaseError) {
-    return error.code;
-  }
-  return null;
+// ── animated background orbs ─────────────────────────────────────────────────
+function Orbs() {
+  return (
+    <div className="pointer-events-none fixed inset-0 overflow-hidden">
+      <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(0,163,255,0.18) 0%, transparent 70%)', animation: 'orbFloat1 12s ease-in-out infinite' }} />
+      <div className="absolute -bottom-40 -right-40 w-[500px] h-[500px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.15) 0%, transparent 70%)', animation: 'orbFloat2 15s ease-in-out infinite' }} />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(0,245,212,0.04) 0%, transparent 60%)' }} />
+      {/* grid */}
+      <div className="absolute inset-0 opacity-[0.03]"
+        style={{ backgroundImage: 'linear-gradient(rgba(0,245,212,1) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,212,1) 1px,transparent 1px)', backgroundSize: '48px 48px' }} />
+    </div>
+  );
 }
+
+// ── Google SVG icon ───────────────────────────────────────────────────────────
+function GoogleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+    </svg>
+  );
+}
+
+// ── input field ───────────────────────────────────────────────────────────────
+function Field({ label, type, value, onChange, placeholder, autoComplete }: {
+  label: string; type: string; value: string;
+  onChange: (v: string) => void; placeholder: string; autoComplete?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-[10px] font-bold uppercase tracking-[0.2em]"
+        style={{ color: focused ? '#00f5d4' : '#64748b' }}>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          autoComplete={autoComplete}
+          required
+          className="w-full rounded-xl px-4 py-3.5 text-sm text-white outline-none transition-all font-mono"
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: `1px solid ${focused ? 'rgba(0,245,212,0.5)' : 'rgba(255,255,255,0.08)'}`,
+            boxShadow: focused ? '0 0 0 3px rgba(0,245,212,0.08)' : 'none',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── main component ────────────────────────────────────────────────────────────
+interface AuthProps { onAuthenticate: () => void; }
 
 export default function Auth({ onAuthenticate }: AuthProps) {
-  const [mode, setMode] = useState<AuthMode>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  const handleEmailAuth = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    setErrorCode(null);
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured) {
+      setError('Supabase is not configured. Add your credentials to frontend/.env.local and restart the server.');
+      return;
+    }
+    
+    setLoading(true); setError(null); setSuccess(null);
     try {
-      if (mode === 'signin') {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (mode === 'signup') {
+        const { error: err } = await supabase.auth.signUp({
+          email: email.trim(), password,
+          options: { data: { full_name: name } },
+        });
+        if (err) throw err;
+        setSuccess('Account created! Check your email to confirm, then sign in.');
+        setMode('signin');
       } else {
-        await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (err) throw err;
+        onAuthenticate();
       }
-      onAuthenticate();
     } catch (err) {
-      setError(readableAuthError(err));
-      setErrorCode(getErrorCode(err));
+      setError(parseError(err).msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    setErrorCode(null);
-
+  const handleGoogle = async () => {
+    // Check if Supabase is configured
+    if (!isSupabaseConfigured) {
+      setError('Supabase is not configured. Add your credentials to frontend/.env.local and restart the server.');
+      return;
+    }
+    
+    setGoogleLoading(true); setError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
-      onAuthenticate();
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/` },
+      });
+      if (err) throw err;
     } catch (err) {
-      setError(readableAuthError(err));
-      setErrorCode(getErrorCode(err));
-    } finally {
-      setLoading(false);
+      setError(parseError(err).msg);
+      setGoogleLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 md:p-8 bg-surface-container-lowest font-sans selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
-      <div className="fixed inset-0 nebula-bg opacity-40" />
-      <div className="fixed inset-0 star-field pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{ background: '#020817' }}>
+      <Orbs />
 
-      <motion.main
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-5xl glass-panel p-8 md:p-12 rounded-[40px] border border-white/10 refracting-border-gradient relative z-10 flex flex-col md:flex-row gap-12 items-stretch"
+      <motion.div
+        initial={{ opacity: 0, y: 32, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 w-full max-w-md"
       >
-        <div className="hidden md:block w-1/2 relative rounded-3xl overflow-hidden border border-white/10 group">
-          <img
-            src="https://images.unsplash.com/photo-1639762681485-074b7f938ba0?q=80&w=2832&auto=format&fit=crop"
-            className="w-full h-full object-cover transition-transform duration-[3s] group-hover:scale-110"
-            referrerPolicy="no-referrer"
-            alt="Cyber security authentication"
-          />
-          <div className="absolute inset-0 bg-primary-container/20 mix-blend-overlay" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-80" />
+        {/* card */}
+        <div className="rounded-3xl p-8 relative overflow-hidden"
+          style={{ background: 'rgba(13,21,38,0.85)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(24px)', boxShadow: '0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,245,212,0.05)' }}>
 
-          <div className="absolute bottom-12 left-12 space-y-4">
-            <div className="flex items-center gap-3 font-label-caps text-[10px] text-primary-container tracking-[0.4em] font-bold uppercase">
-              <Shield size={16} fill="currentColor" className="animate-pulse" />
-              Firebase Auth Active
+          {/* top glow line */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2/3 h-px"
+            style={{ background: 'linear-gradient(90deg, transparent, rgba(0,245,212,0.6), transparent)' }} />
+
+          {/* logo */}
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
+              style={{ background: 'rgba(0,245,212,0.08)', border: '1px solid rgba(0,245,212,0.2)' }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L3 7v5c0 5.25 3.75 10.15 9 11.35C17.25 22.15 21 17.25 21 12V7L12 2z" fill="rgba(0,245,212,0.15)" stroke="#00f5d4" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="M9 12l2 2 4-4" stroke="#00f5d4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
             </div>
-            <h1 className="text-5xl font-black tracking-tighter text-white leading-none">
-              SAFESCAN<br />
-              <span className="font-serif italic font-light lowercase text-primary-container/80">Intelligence</span>
-            </h1>
+            <h1 className="text-2xl font-black tracking-tight text-white">APK Guardian</h1>
+            <p className="text-xs text-slate-500 mt-1 tracking-wide">Mobile Threat Intelligence Platform</p>
           </div>
-        </div>
 
-        <div className="flex-1 w-full flex flex-col justify-center min-h-[500px]">
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <h2 className="text-4xl md:text-5xl font-black tracking-tighter text-on-surface leading-tight">
-                ACCESS<br />TERMINAL
-              </h2>
-              <div className="h-1 w-20 bg-primary-container shadow-[0_0_15px_#00a3ff] rounded-full" />
-              <p className="text-sm text-outline leading-6">
-                Sign in with a Firebase account. New users can create an account with email and password.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.03] p-1">
-              <button
-                type="button"
-                onClick={() => setMode('signin')}
-                className={`rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest transition ${
-                  mode === 'signin' ? 'bg-primary-container text-on-primary-container' : 'text-outline hover:text-on-surface'
-                }`}
-              >
-                Sign in
+          {/* tab toggle */}
+          <div className="flex rounded-xl p-1 mb-6"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {(['signin', 'signup'] as const).map(m => (
+              <button key={m} type="button" onClick={() => { setMode(m); setError(null); setSuccess(null); }}
+                className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase tracking-widest transition-all duration-200"
+                style={{
+                  background: mode === m ? 'rgba(0,245,212,0.12)' : 'transparent',
+                  color: mode === m ? '#00f5d4' : '#64748b',
+                  border: mode === m ? '1px solid rgba(0,245,212,0.25)' : '1px solid transparent',
+                }}>
+                {m === 'signin' ? 'Sign In' : 'Sign Up'}
               </button>
-              <button
-                type="button"
-                onClick={() => setMode('signup')}
-                className={`rounded-xl px-4 py-3 text-xs font-black uppercase tracking-widest transition ${
-                  mode === 'signup' ? 'bg-primary-container text-on-primary-container' : 'text-outline hover:text-on-surface'
-                }`}
-              >
-                Register
-              </button>
-            </div>
+            ))}
+          </div>
 
-            <form onSubmit={handleEmailAuth} className="space-y-6">
-              <label className="block space-y-2 group">
-                <span className="font-label-caps text-[10px] text-outline group-focus-within:text-primary-container transition-colors tracking-widest uppercase">
-                  Email address
-                </span>
-                <div className="flex items-center gap-3 border-b border-white/10 focus-within:border-primary-container transition-colors">
-                  <Mail size={18} className="text-outline" />
-                  <input
-                    type="email"
-                    className="w-full bg-transparent py-4 text-on-surface outline-none font-mono tracking-wide"
-                    placeholder="user@example.com"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    autoComplete="email"
-                    required
-                  />
-                </div>
-              </label>
+          {/* Google button */}
+          <button type="button" onClick={handleGoogle} disabled={googleLoading || loading}
+            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 mb-5 disabled:opacity-50"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+            {googleLoading
+              ? <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+              : <GoogleIcon />}
+            Continue with Google
+          </button>
 
-              <label className="block space-y-2 group">
-                <span className="font-label-caps text-[10px] text-outline group-focus-within:text-primary-container transition-colors tracking-widest uppercase">
-                  Password
-                </span>
-                <div className="flex items-center gap-3 border-b border-white/10 focus-within:border-primary-container transition-colors">
-                  <LockKeyhole size={18} className="text-outline" />
-                  <input
-                    type="password"
-                    className="w-full bg-transparent py-4 text-on-surface outline-none font-mono tracking-wide"
-                    placeholder="Minimum 6 characters"
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
-                    autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                    minLength={6}
-                    required
-                  />
-                </div>
-              </label>
+          {/* divider */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+            <span className="text-[10px] uppercase tracking-widest text-slate-600">or</span>
+            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+          </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-5 bg-primary-container text-on-primary-container rounded-2xl font-black text-xs tracking-[0.35em] uppercase hover:shadow-[0_0_25px_#00a3ff66] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : <ArrowRight size={18} />}
-                {mode === 'signin' ? 'Sign in' : 'Create account'}
-              </button>
-            </form>
+          {/* form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <AnimatePresence>
+              {mode === 'signup' && (
+                <motion.div key="name" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                  <Field label="Full Name" type="text" value={name} onChange={setName} placeholder="Your name" autoComplete="name" />
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            <div className="flex items-center gap-4">
-              <div className="h-px flex-1 bg-white/10" />
-              <span className="text-[10px] font-label-caps text-outline uppercase tracking-widest">or</span>
-              <div className="h-px flex-1 bg-white/10" />
-            </div>
+            <Field label="Email Address" type="email" value={email} onChange={setEmail} placeholder="you@example.com" autoComplete="email" />
+            <Field label="Password" type="password" value={password} onChange={setPassword} placeholder="Min. 6 characters" autoComplete={mode === 'signin' ? 'current-password' : 'new-password'} />
 
-            <button
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full group flex items-center justify-between p-5 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all hover:border-primary-container/50 disabled:opacity-50"
-              type="button"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Chrome className="text-primary-container" size={22} />
-                </div>
-                <div className="text-left">
-                  <span className="block font-bold text-on-surface">Continue with Google</span>
-                  <span className="text-[10px] text-outline font-label-caps uppercase tracking-widest">Firebase OAuth</span>
-                </div>
-              </div>
-              {loading ? <Loader2 className="animate-spin text-primary-container" /> : <ArrowRight className="text-outline group-hover:text-primary-container transition-colors" />}
+            {/* error */}
+            <AnimatePresence>
+              {error && (
+                <motion.div key="err" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="flex items-start gap-2.5 rounded-xl px-4 py-3 text-xs leading-5"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5' }}>
+                  <svg className="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {error}
+                </motion.div>
+              )}
+              {success && (
+                <motion.div key="ok" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                  className="flex items-start gap-2.5 rounded-xl px-4 py-3 text-xs leading-5"
+                  style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#6ee7b7' }}>
+                  <svg className="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  {success}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* submit */}
+            <button type="submit" disabled={loading || googleLoading}
+              className="w-full py-3.5 rounded-xl text-sm font-black uppercase tracking-widest transition-all duration-200 disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg, #00f5d4, #00a3ff)', color: '#020817', boxShadow: '0 0 24px rgba(0,245,212,0.25)' }}>
+              {loading
+                ? <div className="w-5 h-5 rounded-full border-2 border-black/20 border-t-black animate-spin" />
+                : mode === 'signin' ? 'Sign In' : 'Create Account'}
             </button>
+          </form>
 
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
-              >
-                <div className="p-4 bg-error-container/20 border border-error/20 text-error rounded-xl text-xs font-medium leading-5 flex items-start gap-3">
-                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                  <span>AUTH_ERROR: {error}</span>
-                </div>
-
-                {(errorCode === 'auth/operation-not-allowed' || errorCode === 'auth/network-request-failed') && (
-                  <div className="p-4 rounded-xl border border-primary-container/30 bg-primary-container/10 text-on-surface">
-                    <h4 className="font-bold text-xs uppercase tracking-widest mb-2 text-primary-container flex items-center gap-2">
-                      <RefreshCw size={12} />
-                      How to fix
-                    </h4>
-                    <div className="mb-3 p-3 rounded-lg bg-primary-container/20 border border-primary-container/30">
-                      <p className="text-[11px] leading-5 text-on-surface font-semibold">
-                        Quick fix (recommended for local development):
-                      </p>
-                      <p className="text-[11px] leading-5 text-outline">
-                        Run the Firebase Auth Emulator on port <code className="bg-white/10 px-1 py-0.5 rounded text-[10px]">9099</code>:
-                      </p>
-                      <code className="block mt-1 bg-black/40 px-2 py-1.5 rounded text-[10px] font-mono text-primary-container">
-                        firebase emulators:start --only auth
-                      </code>
-                      <p className="text-[10px] text-outline mt-1">
-                        Then start the app with <code className="bg-white/10 px-1 rounded text-[10px]">VITE_FIREBASE_AUTH_EMULATOR=true npm run dev</code>
-                      </p>
-                    </div>
-                    <p className="text-[11px] leading-5 text-outline mb-2">
-                      Or enable the sign-in providers in your live Firebase project:
-                    </p>
-                    <ol className="list-decimal list-inside text-[11px] leading-5 space-y-1 text-outline">
-                      <li>Open the <a href="https://console.firebase.google.com/" target="_blank" rel="noreferrer" className="underline text-primary-container hover:text-on-primary-container">Firebase Console</a></li>
-                      <li>Go to <strong>Authentication → Sign-in method</strong></li>
-                      <li>Enable <strong>Email/Password</strong> and <strong>Google</strong> providers</li>
-                      <li>Add <code className="bg-white/10 px-1 py-0.5 rounded text-[10px]">localhost</code> to <strong>Authorized domains</strong></li>
-                    </ol>
-                  </div>
-                )}
-
-                {errorCode === 'auth/unauthorized-domain' && (
-                  <div className="p-4 rounded-xl border border-primary-container/30 bg-primary-container/10 text-on-surface">
-                    <h4 className="font-bold text-xs uppercase tracking-widest mb-2 text-primary-container flex items-center gap-2">
-                      <RefreshCw size={12} />
-                      How to fix
-                    </h4>
-                    <p className="text-[11px] leading-5 text-outline">
-                      Add <code className="bg-white/10 px-1 py-0.5 rounded text-[10px]">{location.hostname}</code> to
-                      <strong> Authorized domains</strong> in Firebase Console → Authentication → Settings → Authorized domains.
-                    </p>
-                  </div>
-                )}
-              </motion.div>
-            )}
-
-            <p className="text-[10px] leading-5 text-outline">
-              Firebase setup required: enable Email/Password and Google providers in Firebase Authentication. Add
-              localhost to Authorized domains if Google sign-in says unauthorized domain.
-            </p>
-          </div>
+          {/* footer */}
+          <p className="text-center text-[10px] text-slate-600 mt-6 leading-5">
+            By continuing you agree to our{' '}
+            <span className="text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">Terms of Service</span>
+            {' '}and{' '}
+            <span className="text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">Privacy Policy</span>
+          </p>
         </div>
-      </motion.main>
+
+        {/* setup hint — only shown when Supabase is not configured */}
+        {!isSupabaseConfigured && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
+            className="mt-4 rounded-2xl px-5 py-4 text-xs leading-6"
+            style={{ background: 'rgba(0,163,255,0.06)', border: '1px solid rgba(0,163,255,0.15)', color: '#94a3b8' }}>
+            <span className="font-bold text-sky-400">⚠️ Setup Required:</span> Add your Supabase keys to{' '}
+            <code className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-slate-300">frontend/.env.local</code>
+            {' '}as <code className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-slate-300">VITE_SUPABASE_URL</code> and{' '}
+            <code className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] text-slate-300">VITE_SUPABASE_ANON_KEY</code>.
+            {' '}Enable Email + Google providers in your{' '}
+            <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-sky-400 underline hover:text-sky-300">Supabase dashboard</a>.
+            {' '}Then restart the server.
+          </motion.div>
+        )}
+      </motion.div>
+
+      <style>{`
+        @keyframes orbFloat1 {
+          0%,100% { transform: translate(0,0) scale(1); }
+          50% { transform: translate(40px,30px) scale(1.08); }
+        }
+        @keyframes orbFloat2 {
+          0%,100% { transform: translate(0,0) scale(1); }
+          50% { transform: translate(-30px,-40px) scale(1.06); }
+        }
+      `}</style>
     </div>
   );
 }
