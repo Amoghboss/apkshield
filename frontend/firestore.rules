@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Common Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    // User Profile Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.uid == request.auth.uid &&
+               data.email is string &&
+               data.role in ['user', 'admin'] &&
+               data.keys().hasAll(['uid', 'email', 'role']) &&
+               data.keys().size() >= 3;
+      }
+      
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastLogin']);
+    }
+
+    // Ingestions Rules
+    match /ingestions/{ingestionId} {
+      function isValidIngestion(data) {
+        return data.userId == request.auth.uid &&
+               data.fileName is string && data.fileName.size() <= 256 &&
+               data.status in ['SECURE', 'WARNING', 'DANGER'] &&
+               data.timestamp == request.time;
+      }
+      
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidIngestion(incoming());
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    // Verdicts Rules
+    match /verdicts/{verdictId} {
+      function isValidVerdict(data) {
+        return data.timestamp == request.time &&
+               data.title is string && data.title.size() <= 128 &&
+               data.type in ['info', 'alert'];
+      }
+      
+      allow list: if isSignedIn();
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidVerdict(incoming());
+    }
+  }
+}
