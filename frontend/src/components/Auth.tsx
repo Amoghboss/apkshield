@@ -14,9 +14,16 @@ function parseError(err: unknown): { msg: string; code: string | null } {
       user_already_exists:   'An account already exists with this email.',
       weak_password:         'Password must be at least 6 characters.',
       invalid_email:         'Enter a valid email address.',
-      provider_disabled:     'Google sign-in is not enabled yet — see setup below.',
-      provider_not_enabled:  'Google sign-in is not enabled yet — see setup below.',
+      provider_disabled:     'Google sign-in is not enabled in your Supabase project. Enable it in Authentication → Providers.',
+      provider_not_enabled:  'Google sign-in is not enabled in your Supabase project. Enable it in Authentication → Providers.',
+      validation_failed:     'Google sign-in is not configured. Enable Google provider in your Supabase dashboard.',
     };
+    
+    // Handle specific error messages
+    if (err.message.includes('provider is not enabled') || err.message.includes('Unsupported provider')) {
+      return { msg: 'Google sign-in is not enabled in your Supabase project. Enable it in Authentication → Providers.', code };
+    }
+    
     return { msg: map[code] ?? err.message, code };
   }
   return { msg: 'Authentication failed. Please try again.', code: null };
@@ -197,24 +204,28 @@ export default function Auth({ onAuthenticate }: AuthProps) {
             ))}
           </div>
 
-          {/* Google button */}
-          <button type="button" onClick={handleGoogle} disabled={googleLoading || loading}
-            className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 mb-5 disabled:opacity-50"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
-            {googleLoading
-              ? <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
-              : <GoogleIcon />}
-            Continue with Google
-          </button>
+          {/* Google button - only show if Supabase is configured */}
+          {isSupabaseConfigured && (
+            <>
+              <button type="button" onClick={handleGoogle} disabled={googleLoading || loading}
+                className="w-full flex items-center justify-center gap-3 py-3.5 rounded-xl text-sm font-semibold text-white transition-all duration-200 mb-5 disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}>
+                {googleLoading
+                  ? <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                  : <GoogleIcon />}
+                Continue with Google
+              </button>
 
-          {/* divider */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
-            <span className="text-[10px] uppercase tracking-widest text-slate-600">or</span>
-            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
-          </div>
+              {/* divider */}
+              <div className="flex items-center gap-3 mb-5">
+                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+                <span className="text-[10px] uppercase tracking-widest text-slate-600">or</span>
+                <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.07)' }} />
+              </div>
+            </>
+          )}
 
           {/* form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -280,6 +291,20 @@ export default function Auth({ onAuthenticate }: AuthProps) {
             {' '}Enable Email + Google providers in your{' '}
             <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-sky-400 underline hover:text-sky-300">Supabase dashboard</a>.
             {' '}Then restart the server.
+          </motion.div>
+        )}
+
+        {/* Google setup hint - shown when Supabase is configured but Google fails */}
+        {isSupabaseConfigured && error && error.includes('Google sign-in is not enabled') && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="mt-4 rounded-2xl px-5 py-4 text-xs leading-6"
+            style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)', color: '#94a3b8' }}>
+            <span className="font-bold text-yellow-400">💡 Google OAuth Setup:</span> To enable Google sign-in:
+            <br />1. Go to{' '}
+            <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer" className="text-yellow-400 underline hover:text-yellow-300">Supabase Dashboard</a>
+            <br />2. Authentication → Providers → Enable Google
+            <br />3. Add Google OAuth credentials from{' '}
+            <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="text-yellow-400 underline hover:text-yellow-300">Google Cloud Console</a>
           </motion.div>
         )}
       </motion.div>
