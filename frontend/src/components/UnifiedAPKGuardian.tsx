@@ -6,19 +6,26 @@ import APKProtectionTool from './APKProtectionTool';
 import Auth from './Auth';
 import Monitor from './Monitor';
 import Profile from './Profile';
+import CommandCenter from './CommandCenter';
+import NetworkMonitor from './NetworkMonitor';
+import VaultSystem from './VaultSystem';
 import { 
   Shield, 
   User as UserIcon, 
   Activity, 
   LogOut, 
   Menu, 
-  X 
+  X,
+  Command,
+  ScanLine,
+  Network,
+  Lock
 } from 'lucide-react';
 
 export default function UnifiedAPKGuardian() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'scanner' | 'auth' | 'monitor' | 'profile'>('scanner');
+  const [activeTab, setActiveTab] = useState<'command' | 'scans' | 'network' | 'vault' | 'auth' | 'profile'>('command');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -47,13 +54,17 @@ export default function UnifiedAPKGuardian() {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
     }
-    setActiveTab('scanner');
+    setActiveTab('command');
     setSidebarOpen(false);
   };
 
   const handleAuthenticate = () => {
-    setActiveTab('scanner');
+    setActiveTab('command');
     setSidebarOpen(false);
+  };
+
+  const handleNavigation = (tab: string) => {
+    setActiveTab(tab as 'command' | 'scans' | 'network' | 'vault' | 'auth' | 'profile');
   };
 
   if (loading) {
@@ -65,10 +76,12 @@ export default function UnifiedAPKGuardian() {
   }
 
   const tabs = [
-    { id: 'scanner', label: 'APK Scanner', icon: Shield, public: true },
+    { id: 'command', label: 'Command', icon: Command, public: true },
+    { id: 'scans', label: 'Scans', icon: ScanLine, public: true },
+    { id: 'network', label: 'Network', icon: Network, public: true },
+    { id: 'vault', label: 'Vault', icon: Lock, public: true },
     { id: 'auth', label: user ? 'Account' : 'Sign In', icon: UserIcon, public: true },
     ...(user ? [
-      { id: 'monitor', label: 'Monitor', icon: Activity, public: false },
       { id: 'profile', label: 'Profile', icon: UserIcon, public: false },
     ] : [])
   ];
@@ -96,8 +109,8 @@ export default function UnifiedAPKGuardian() {
                 <Shield className="w-6 h-6" style={{ color: '#00f5d4' }} />
               </div>
               <div>
-                <h1 className="text-xl font-black text-white">APK Guardian</h1>
-                <p className="text-xs text-slate-500">Mobile Threat Intelligence</p>
+                <h1 className="text-xl font-black text-white">AEGIS HUD</h1>
+                <p className="text-xs text-slate-500">Cybersecurity Command Center</p>
               </div>
             </div>
 
@@ -217,15 +230,51 @@ export default function UnifiedAPKGuardian() {
       {/* Main Content */}
       <main className="relative z-10">
         <AnimatePresence mode="wait">
-          {activeTab === 'scanner' && (
+          {activeTab === 'command' && (
             <motion.div
-              key="scanner"
+              key="command"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <APKProtectionTool />
+              <CommandCenter onNavigate={handleNavigation} />
+            </motion.div>
+          )}
+
+          {activeTab === 'scans' && (
+            <motion.div
+              key="scans"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <APKProtectionTool onNavigate={handleNavigation} />
+            </motion.div>
+          )}
+
+          {activeTab === 'network' && (
+            <motion.div
+              key="network"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <NetworkMonitor onNavigate={handleNavigation} />
+            </motion.div>
+          )}
+
+          {activeTab === 'vault' && (
+            <motion.div
+              key="vault"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <VaultSystem onNavigate={handleNavigation} />
             </motion.div>
           )}
 
@@ -251,11 +300,11 @@ export default function UnifiedAPKGuardian() {
                       
                       <div className="space-y-3">
                         <button
-                          onClick={() => setActiveTab('monitor')}
+                          onClick={() => setActiveTab('command')}
                           className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200"
                           style={{ background: 'linear-gradient(135deg, #00f5d4, #00a3ff)', color: '#020817' }}
                         >
-                          View Dashboard
+                          View Command Center
                         </button>
                         <button
                           onClick={() => setActiveTab('profile')}
@@ -277,18 +326,6 @@ export default function UnifiedAPKGuardian() {
               ) : (
                 <Auth onAuthenticate={handleAuthenticate} />
               )}
-            </motion.div>
-          )}
-
-          {activeTab === 'monitor' && user && (
-            <motion.div
-              key="monitor"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Monitor />
             </motion.div>
           )}
 

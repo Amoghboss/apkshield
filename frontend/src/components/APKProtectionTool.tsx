@@ -12,10 +12,13 @@ import {
   Upload,
   XCircle,
 } from 'lucide-react';
+import BottomNavigation from './BottomNavigation';
+import DebugPanel from './DebugPanel';
 
 const API_BASE = '/api';
-const WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
+const WS_BASE = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.hostname}:8000`;
 const clientId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+console.log('[APKProtectionTool] API_BASE', API_BASE, 'WS_BASE', WS_BASE);
 
 type Finding = {
   permission: string;
@@ -222,7 +225,7 @@ function ResultReport({ result }: { result: ScanResult }) {
   );
 }
 
-export default function APKProtectionTool() {
+export default function APKProtectionTool({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const fileInput = useRef<HTMLInputElement | null>(null);
   const [mode, setMode] = useState<'file' | 'url'>('file');
   const [file, setFile] = useState<File | null>(null);
@@ -240,26 +243,50 @@ export default function APKProtectionTool() {
   }, [file]);
 
   useEffect(() => {
+    console.log('[APKProtectionTool] Connecting to API:', API_BASE);
+    console.log('[APKProtectionTool] Connecting to WebSocket:', WS_BASE);
+    
     fetch(`${API_BASE}/health`)
-      .then((response) => setBackendOnline(response.ok))
-      .catch(() => setBackendOnline(false));
+      .then((response) => {
+        console.log('[APKProtectionTool] Health check response:', response.status);
+        setBackendOnline(response.ok);
+      })
+      .catch((error) => {
+        console.error('[APKProtectionTool] Health check failed:', error);
+        setBackendOnline(false);
+      });
 
     const ws = new WebSocket(`${WS_BASE}/ws/${clientId}`);
-    ws.onopen = () => setBackendOnline(true);
-    ws.onclose = () => setBackendOnline(false);
-    ws.onerror = () => setBackendOnline(false);
+    ws.onopen = () => {
+      console.log('[APKProtectionTool] WebSocket connected');
+      setBackendOnline(true);
+      setLogs((items) => [...items, 'Live scanner connected.']);
+    };
+    ws.onclose = () => {
+      console.log('[APKProtectionTool] WebSocket disconnected');
+      setBackendOnline(false);
+      setLogs((items) => [...items, 'WebSocket connection closed. Live scan updates are unavailable.']);
+    };
+    ws.onerror = (event) => {
+      console.error('[APKProtectionTool] WebSocket error:', event);
+      setBackendOnline(false);
+      setError('Live scanner connection failed. Restart the backend and refresh the page.');
+    };
     ws.onmessage = (event) => {
+      console.log('[APKProtectionTool] WebSocket message received:', event.data);
       const data = JSON.parse(event.data);
       if (data.stage === 'progress') {
         setProgress({ step: data.step, total: data.total, msg: data.msg });
         setLogs((items) => [...items, data.msg]);
       }
       if (data.stage === 'error') {
+        console.error('[APKProtectionTool] Scan error from backend:', data.msg);
         setError(data.msg);
         setProgress(null);
         setIsScanning(false);
       }
       if (data.stage === 'done') {
+        console.log('[APKProtectionTool] Scan completed:', data);
         setResult(data);
         setProgress(null);
         setIsScanning(false);
@@ -276,8 +303,13 @@ export default function APKProtectionTool() {
   };
 
   const scanFile = async () => {
+    console.log('[APKProtectionTool] Starting file scan...');
     if (!file) {
       setError('Select an APK file first.');
+      return;
+    }
+    if (!backendOnline) {
+      setError('Backend unavailable. Make sure the backend server is running on port 8000.');
       return;
     }
     resetScan();
@@ -288,10 +320,13 @@ export default function APKProtectionTool() {
     form.append('file', file);
 
     try {
+      console.log('[APKProtectionTool] Sending file to:', `${API_BASE}/scan?client_id=${clientId}`);
       const response = await fetch(`${API_BASE}/scan?client_id=${clientId}`, { method: 'POST', body: form });
       const payload = await response.json();
+      console.log('[APKProtectionTool] Scan response:', response.status, payload);
       if (!response.ok || payload.error) throw new Error(payload.error || 'Scan failed.');
     } catch (err) {
+      console.error('[APKProtectionTool] Scan error:', err);
       setError(err instanceof Error ? err.message : 'Scan failed.');
       setProgress(null);
       setIsScanning(false);
@@ -299,8 +334,13 @@ export default function APKProtectionTool() {
   };
 
   const scanUrl = async () => {
+    console.log('[APKProtectionTool] Starting URL scan...');
     if (!url.trim()) {
       setError('Paste a direct APK download link first.');
+      return;
+    }
+    if (!backendOnline) {
+      setError('Backend unavailable. Make sure the backend server is running on port 8000.');
       return;
     }
     resetScan();
@@ -308,14 +348,17 @@ export default function APKProtectionTool() {
     setProgress({ step: 1, total: 6, msg: 'Sending APK link to backend...' });
 
     try {
+      console.log('[APKProtectionTool] Sending URL to:', `${API_BASE}/scan-url`);
       const response = await fetch(`${API_BASE}/scan-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, client_id: clientId }),
       });
       const payload = await response.json();
+      console.log('[APKProtectionTool] URL scan response:', response.status, payload);
       if (!response.ok || payload.error) throw new Error(payload.error || 'URL scan failed.');
     } catch (err) {
+      console.error('[APKProtectionTool] URL scan error:', err);
       setError(err instanceof Error ? err.message : 'URL scan failed.');
       setProgress(null);
       setIsScanning(false);
@@ -324,6 +367,7 @@ export default function APKProtectionTool() {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),radial-gradient(circle_at_80%_20%,rgba(244,114,182,0.10),transparent_30%),#020617] px-4 py-6 text-slate-100 sm:px-6 lg:px-10">
+      <DebugPanel />
       <div className="mx-auto max-w-7xl space-y-8">
         <header className="flex flex-col gap-6 border-b border-white/10 pb-8 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -431,6 +475,11 @@ export default function APKProtectionTool() {
             {result && <ResultReport result={result} />}
           </div>
         </section>
+
+        {/* Bottom Navigation */}
+        <div className="mt-8">
+          <BottomNavigation activeTab="scans" onNavigate={onNavigate || (() => {})} />
+        </div>
       </div>
     </main>
   );

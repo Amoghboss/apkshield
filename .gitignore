@@ -9,6 +9,10 @@ backend/uploads/
 frontend/node_modules/
 frontend/dist/
 
+# Uploads and APK files
+uploads/
+*.apk
+
 # Misc
 .vscode/
 *.log

@@ -16,17 +16,18 @@ View your app in AI Studio: https://ai.studio/apps/0fc593df-4896-4460-8f21-a3696
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Choose your Firebase Auth setup:
-   - **Recommended for local development:** Start the Firebase Auth Emulator:
-     ```bash
-     firebase emulators:start --only auth
+3. Set up Supabase Authentication:
+   - Create a project at [supabase.com](https://supabase.com)
+   - Go to **Authentication → Providers** and enable **Email** and **Google**
+   - Add `http://localhost:3000` (or your dev URL) to **Redirect URLs** under Authentication → URL Configuration
+   - Copy your **Project URL** and **anon public API key** from Project Settings → API
+   - Create `.env.local` in the `frontend` folder and add:
      ```
-     Then run the app with the emulator flag:
-     ```bash
-     VITE_FIREBASE_AUTH_EMULATOR=true npm run dev
+     VITE_SUPABASE_URL=https://your-project.supabase.co
+     VITE_SUPABASE_ANON_KEY=your-anon-key
      ```
-   - **Using live Firebase:** Enable Email/Password and Google sign-in in the [Firebase Console](https://console.firebase.google.com/), then add `localhost` to Authorized domains under Authentication → Sign-in method.
-4. Run the app (if not already running):
+4. Run the app:
    `npm run dev`
 
-> **Note:** The frontend only connects to the Firebase Auth Emulator when `VITE_FIREBASE_AUTH_EMULATOR=true` is set. This prevents accidental live-project auth during development. If you see `auth/operation-not-allowed`, either start the emulator with the flag above, or enable the sign-in providers in your live Firebase project.
+> **Note:** If you see an error like "This sign-in method is not enabled", make sure Email and Google providers are enabled in your Supabase project dashboard.
+

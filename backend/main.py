@@ -485,11 +485,25 @@ async def scan_url(req: URLScanRequest):
                 resp = await client.get(url)
                 if resp.status_code != 200:
                     await send({"stage": "error", "msg": f"Download failed: HTTP {resp.status_code}"}); return
-                ct = resp.headers.get("content-type", "")
-                if "html" in ct and len(resp.content) < 100_000:
+
+                final_url = str(resp.url)
+                content_type = resp.headers.get("content-type", "").lower()
+                content_disposition = resp.headers.get("content-disposition", "").lower()
+                is_apk_content = resp.content[:2] == b"PK"
+                is_apk_header = (
+                    final_url.lower().endswith(".apk") or
+                    ".apk" in content_disposition or
+                    "application/vnd.android.package-archive" in content_type or
+                    "apk" in content_type
+                )
+
+                if "html" in content_type and len(resp.content) < 100_000 and not is_apk_content:
                     await send({"stage": "error", "msg": "URL does not point to an APK file."}); return
                 if len(resp.content) > MAX_APK_BYTES:
                     await send({"stage": "error", "msg": "Downloaded APK is too large. Maximum size is 150 MB."}); return
+                if not is_apk_content and not is_apk_header:
+                    await send({"stage": "error", "msg": "Downloaded file does not appear to be an APK. Please provide a direct APK link ending in .apk."}); return
+
                 path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}.apk")
                 with open(path, "wb") as f:
                     f.write(resp.content)
@@ -504,12 +518,123 @@ async def scan_url(req: URLScanRequest):
     asyncio.create_task(download_and_scan())
     return {"status": "started"}
 
+@app.get("/api/telemetry")
+async def get_telemetry():
+    """Get live system telemetry data for the command center"""
+    import random
+    import time
+    
+    return {
+        "timestamp": int(time.time()),
+        "reactor_core": round(4620 + (random.random() - 0.5) * 100, 1),
+        "hull_integrity": round(max(95, min(100, 100 + (random.random() - 0.5) * 2)), 1),
+        "oxygen_levels": round(max(95, min(100, 98.2 + (random.random() - 0.5) * 1)), 1),
+        "shield_level": round(max(70, min(80, 75 + (random.random() - 0.5) * 3)), 1),
+        "threat_level": max(0, min(0.01, 0.002 + (random.random() - 0.5) * 0.002)),
+        "active_connections": 1204 + int((random.random() - 0.5) * 20),
+        "traffic_volume": round(max(10, min(20, 14.8 + (random.random() - 0.5) * 2)), 1),
+        "network_latency": round(max(8, min(20, 12 + (random.random() - 0.5) * 2)), 1),
+        "neural_health": round(max(5, min(10, 7 + (random.random() - 0.5) * 1)), 1),
+        "system_status": "OPTIMAL",
+        "coordinates": "X-772 Y-982"
+    }
+
+@app.get("/api/network/nodes")
+async def get_network_nodes():
+    """Get network node status for network monitoring"""
+    import random
+    
+    nodes = [
+        {
+            "id": "alpha-7",
+            "name": "Network Node Alpha-7", 
+            "status": "active",
+            "threat": "critical",
+            "traffic": round(14.8 + (random.random() - 0.5) * 2, 1),
+            "relays": 1204 + int((random.random() - 0.5) * 50),
+            "latency": round(12 + (random.random() - 0.5) * 3, 1)
+        },
+        {
+            "id": "beta-3",
+            "name": "Network Node Beta-3",
+            "status": "active", 
+            "threat": "low",
+            "traffic": round(8.2 + (random.random() - 0.5) * 2, 1),
+            "relays": 892 + int((random.random() - 0.5) * 50),
+            "latency": round(8 + (random.random() - 0.5) * 3, 1)
+        },
+        {
+            "id": "gamma-1",
+            "name": "Network Node Gamma-1",
+            "status": "standby",
+            "threat": "medium", 
+            "traffic": round(3.1 + (random.random() - 0.5) * 2, 1),
+            "relays": 445 + int((random.random() - 0.5) * 50),
+            "latency": round(15 + (random.random() - 0.5) * 3, 1)
+        }
+    ]
+    
+    return {"nodes": nodes}
+
+@app.get("/api/network/connections")
+async def get_active_connections():
+    """Get active network connections"""
+    import random
+    
+    origins = ["Terra-Prime-7", "Nexus-Station-Alpha", "Orbital-Relay-9", "Deep-Space-12", "Mining-Station-X"]
+    packets = ["Encrypted", "Data Stream", "Command", "Telemetry", "Emergency"]
+    statuses = ["secure", "active", "priority", "warning"]
+    actions = ["TERMINATE", "MONITOR", "SECURE"]
+    
+    connections = []
+    for i in range(3):
+        connections.append({
+            "origin": random.choice(origins),
+            "packet": random.choice(packets),
+            "status": random.choice(statuses),
+            "bandwidth": random.randint(50, 250),
+            "action": random.choice(actions)
+        })
+    
+    return {"connections": connections}
+
+@app.get("/api/system/logs")
+async def get_system_logs():
+    """Get recent system logs"""
+    import random
+    from datetime import datetime
+    
+    messages = [
+        "Quantum encryption verified",
+        "Threat assessment complete", 
+        "Network optimization active",
+        "Security protocols updated",
+        "Data synchronization in progress",
+        "System diagnostics running",
+        "Firewall rules updated",
+        "Backup systems online",
+        "Initializing deep scan...",
+        "Syncing orbital vectors",
+        "Neural link established",
+        "Communication active"
+    ]
+    
+    logs = []
+    for i in range(5):
+        logs.append({
+            "timestamp": datetime.now().strftime("%H:%M:%S"),
+            "message": random.choice(messages),
+            "type": random.choice(["info", "info", "info", "warning", "success"])
+        })
+    
+    return {"logs": logs}
+
 @app.get("/")
 async def root():
     return {
-        "message": "APK Guardian API", 
+        "message": "AEGIS HUD API", 
         "version": "3.0.0",
-        "frontend_url": "http://localhost:3001",
+        "frontend_url": "http://localhost:3000",
         "docs": "/docs"
     }
 

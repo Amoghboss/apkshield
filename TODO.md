@@ -1,14 +1,21 @@
-# Fix Firebase Auth Error: AUTH_ERROR / operation-not-allowed
+# Migrate from Firebase to Supabase
 
 ## Steps
-1. [x] Add Firebase Auth Emulator support to `frontend/src/firebase.ts`
-2. [x] Improve error UI for `auth/operation-not-allowed` in `frontend/src/components/Auth.tsx`
-3. [x] Update `frontend/README.md` with Firebase Auth setup instructions
-4. [x] Test the changes — `npm run build` and `npm run lint` both pass
+1. [x] Install `@supabase/supabase-js` and uninstall `firebase`
+2. [x] Create `frontend/src/supabase.ts` with Supabase client initialization
+3. [x] Update `frontend/src/App.tsx` to use Supabase auth state (`onAuthStateChange`)
+4. [x] Rewrite `frontend/src/components/Auth.tsx` to use Supabase email/password + Google OAuth
+5. [x] Delete Firebase config files (`firebase.ts`, `firebase-applet-config.json`, `firebase-blueprint.json`, `firestore.rules`)
+6. [x] Update `frontend/src/vite-env.d.ts` with `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+7. [x] Update `frontend/README.md` with Supabase setup instructions
+8. [x] Remove `@firebase/eslint-plugin-security-rules` dev dependency
+9. [x] Test the changes — `npm run build` and `npm run lint` both pass
 
 ## Summary
-- `firebase.ts` now auto-connects to the Firebase Auth Emulator on `localhost`/`127.0.0.1` with a clear console warning if it's not running.
-- `Auth.tsx` HTML structure was fixed (missing `</div>` tags) and the `operation-not-allowed` error UI now prominently shows the emulator command as the quick fix.
-- `README.md` now recommends starting the emulator first, with a note explaining why `operation-not-allowed` happens when it's not running.
-- `APKProtectionTool.tsx` type error with dynamic Lucide icon rendering was fixed with a proper `React.ElementType` type assertion.
-- `@types/react` and `@types/react-dom` were installed as dev dependencies to resolve JSX type errors.
+- Replaced Firebase Auth with Supabase Auth (email/password + Google OAuth).
+- `App.tsx` now listens to `supabase.auth.onAuthStateChange` for session changes.
+- `Auth.tsx` uses `supabase.auth.signInWithPassword`, `supabase.auth.signUp`, and `supabase.auth.signInWithOAuth({ provider: 'google' })`.
+- Error messages and "How to fix" UI now reference Supabase Dashboard instead of Firebase Console.
+- All Firebase config files and dependencies have been removed.
+- Google OAuth now uses Supabase's redirect-based flow (more reliable than popups).
+

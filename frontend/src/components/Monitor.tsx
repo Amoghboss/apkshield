@@ -1,33 +1,24 @@
 import { motion } from 'motion/react';
-import { ShieldAlert, Activity, Hash, CloudUpload, Filter, Zap, ArrowUpRight, Search } from 'lucide-react';
+import { ShieldAlert, Activity, Zap, ShieldCheck } from 'lucide-react';
 
-const stats = [
-  { 
-    title: 'System Status', 
-    value: 'OPERATIONAL', 
-    icon: ShieldAlert, 
-    color: 'text-primary-container',
-    footer: 'ALL SYSTEMS NOMINAL',
-    footerIcon: true,
-    shadow: 'shadow-[0_0_20px_#00a3ff]'
-  },
-  { 
-    title: 'Total Scans', 
-    value: '1.4M+', 
-    icon: Activity, 
-    color: 'text-secondary', 
-    progress: 75,
-    shadow: 'shadow-[0_0_20px_#dcb8ff]'
-  },
-  { 
-    title: 'Threats Neutralized', 
-    value: '24,802', 
-    icon: Hash, 
-    color: 'text-tertiary-container', 
-    footer: '+142 SINCE LAST CYCLE',
-    shadow: 'shadow-[0_0_20px_#ff704c]'
-  }
-];
+// MetricBar component
+const MetricBar = ({ label, value, score, color }: { label: string; value: string; score: number; color: string }) => (
+  <div className="space-y-3">
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-slate-400">{label}</span>
+      <span className="font-mono text-white">{value}</span>
+    </div>
+    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+      <div 
+        className="h-full rounded-full transition-all duration-1000"
+        style={{ 
+          width: `${score}%`,
+          backgroundColor: color
+        }}
+      />
+    </div>
+  </div>
+);
 
 const entries = [
   {
@@ -60,169 +51,129 @@ const entries = [
   }
 ];
 
+const metrics = [
+  { label: 'Network Entropy', value: '24.2%', score: 24, color: '#fb7185' },
+  { label: 'Threat Saturation', value: '68.1%', score: 68, color: '#a78bfa' },
+  { label: 'Neural Integrity', value: '99.8%', score: 100, color: '#38bdf8' },
+];
+
+const summary = [
+  'Stable neural mesh with low drift.',
+  'Threat vectors isolated and contained.',
+  'Scan latency remains under 15ms.',
+];
+
 export default function Monitor() {
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="max-w-[1440px] mx-auto space-y-12 pb-24"
-    >
-      {/* Header Section */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-8 mb-12">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 font-label-caps text-xs tracking-[0.3em] text-primary-container uppercase font-bold">
-            <Zap size={16} fill="currentColor" />
-            Active Scan Terminal
-          </div>
-          <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-on-surface leading-none">
-            THREAT<br/>
-            <span className="font-serif italic font-light lowercase ml-6 text-outline">Intelligence</span>
-          </h1>
-        </div>
-        <div className="glass-panel py-3 px-6 rounded-full border border-white/10 refracting-border-gradient flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full border-2 border-primary-container/20 flex items-center justify-center">
-            <Search size={18} className="text-outline" />
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] font-label-caps text-outline uppercase tracking-widest leading-none">Current Cycle</div>
-            <div className="text-xs font-bold font-label-caps text-on-surface tracking-widest mt-1">AX-774-001</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {stats.map((stat, i) => (
-          <motion.div 
-            key={i}
-            whileHover={{ y: -8 }}
-            className={`glass-panel p-8 rounded-2xl border border-white/10 refracting-border-gradient relative overflow-hidden group`}
-          >
-            <div className="flex justify-between items-start mb-12">
-              <div className={`p-4 rounded-xl bg-current/10 border border-current/20 ${stat.color}`}>
-                <stat.icon size={24} />
-              </div>
-              <ArrowUpRight className="text-outline/40 group-hover:text-on-surface transition-colors" size={20} />
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-[1600px] mx-auto pb-24 space-y-8">
+      <section className="grid gap-8 lg:grid-cols-[1.6fr_0.9fr]">
+        <div className="space-y-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-full bg-primary-container/15 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-primary-container font-semibold border border-primary-container/20">
+              Active Scan Terminal
             </div>
-            
-            <div className="space-y-1">
-              <h3 className="font-label-caps text-[10px] text-outline tracking-widest uppercase">{stat.title}</h3>
-              <div className="text-4xl font-black tracking-tight text-on-surface">{stat.value}</div>
+            <div className="rounded-full border border-white/10 bg-slate-900/60 px-4 py-2 text-[10px] uppercase tracking-[0.35em] text-slate-400">
+              1,204 High Risks Detected
             </div>
+          </div>
 
-            <div className="mt-8 pt-6 border-t border-white/5 space-y-4">
-              {stat.progress ? (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-bold tracking-widest text-outline uppercase">
-                    <span>Scan Coverage</span>
-                    <span className="text-primary-container">{stat.progress}%</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${stat.progress}%` }}
-                      className={`h-full bg-primary-container ${stat.shadow}`} 
-                    />
-                  </div>
+          <div className="rounded-[2rem] border border-white/10 bg-surface-container/85 p-8 overflow-hidden relative shadow-panel">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.12)_0%,rgba(14,165,233,0.06)_20%,transparent_35%),radial-gradient(circle_at_70%_80%,rgba(168,85,247,0.12),transparent_18%)]" />
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-slate-900/60 to-slate-950/95" />
+            <div className="relative flex flex-col h-full">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.35em] text-slate-500">Secure Status</div>
+                  <h1 className="mt-3 text-5xl md:text-6xl font-black tracking-tight text-white">SAFESCAN AI</h1>
                 </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  {stat.footerIcon && <div className="w-1.5 h-1.5 rounded-full bg-primary-container animate-ping" />}
-                  <span className="text-[9px] font-label-caps text-outline uppercase tracking-[0.2em]">
-                    {stat.footer}
-                  </span>
+                <div className="rounded-full border border-white/10 bg-slate-900/90 px-4 py-3 text-xs uppercase tracking-[0.35em] text-primary-container font-semibold flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-primary-container animate-pulse" />
+                  SECURE LAYER 7
                 </div>
-              )}
-            </div>
-            
-            <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity">
-              <stat.icon size={120} />
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Lower Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Dropzone Feature */}
-        <div className="lg:col-span-8 glass-panel rounded-3xl border border-white/10 refracting-border-gradient overflow-hidden relative group h-[480px]">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-container/5 to-transparent transition-opacity group-hover:opacity-100 opacity-60" />
-          
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-[400px] h-[400px] border border-white/5 rounded-full animate-[spin_60s_linear_infinite]" />
-            <div className="w-[300px] h-[300px] border border-white/10 rounded-full animate-[spin_40s_linear_infinite_reverse] absolute" />
-            <div className="w-[200px] h-[200px] border border-white/15 rounded-full animate-[spin_20s_linear_infinite] absolute" />
-          </div>
-
-          <div className="relative h-full flex flex-col items-center justify-center p-12 text-center">
-            <motion.div 
-              whileHover={{ scale: 1.02 }}
-              className="glass-panel p-16 rounded-[40px] border border-white/20 backdrop-blur-3xl shadow-2xl space-y-8 max-w-md w-full cursor-pointer hover:border-primary-container/50 transition-all group"
-            >
-              <div className="w-20 h-20 rounded-full bg-primary-container/10 border-2 border-primary-container/30 flex items-center justify-center mx-auto group-hover:scale-110 transition-transform shadow-[0_0_30px_rgba(0,163,255,0.2)]">
-                <CloudUpload className="text-primary-container" size={32} />
               </div>
-              <div className="space-y-2">
-                <h2 className="text-3xl font-black tracking-tighter text-on-surface">Neural Ingest</h2>
-                <p className="text-outline font-label-caps text-[10px] tracking-widest uppercase">Target Payload: Binary / APK / ZIP</p>
+
+              <div className="relative flex-1 flex items-center justify-center">
+                <div className="relative w-[520px] max-w-full aspect-square">
+                  <div className="absolute inset-0 rounded-full border border-white/10" />
+                  <div className="absolute inset-10 rounded-full border border-white/10" />
+                  <div className="absolute inset-20 rounded-full border border-white/10" />
+                  <div className="absolute inset-32 rounded-full border border-white/10" />
+                  <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.12)_0%,transparent_55%)]" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-32 h-32 rounded-full border border-primary-container/40 bg-slate-950/60 flex flex-col items-center justify-center text-center">
+                      <div className="text-xs uppercase tracking-[0.35em] text-slate-400">NEURAL HEALTH</div>
+                      <div className="text-6xl font-black text-white">7</div>
+                      <div className="text-xs uppercase tracking-[0.35em] text-slate-500">secure nodes</div>
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 rounded-full border border-primary-container/20 opacity-50" />
+                  <div className="absolute left-1/2 top-1/2 h-[260px] w-[1px] bg-gradient-to-b from-primary-container/70 via-transparent to-transparent origin-top animate-radar-sweep" />
+                </div>
               </div>
-              <button className="w-full py-4 bg-primary-container text-on-primary-container rounded-2xl font-black text-xs tracking-[0.3em] uppercase hover:shadow-[0_0_25px_rgba(0,163,255,0.4)] active:scale-95 transition-all">
-                Initialize Sequence
-              </button>
-            </motion.div>
-          </div>
-          
-          <div className="absolute top-8 left-8 flex items-center gap-2">
-            <Activity className="text-primary-container animate-pulse" size={16} />
-            <span className="font-label-caps text-[10px] text-outline uppercase tracking-widest">Awaiting Command Data</span>
+
+              <div className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {metrics.map((metric) => (
+                  <div key={metric.label} className="rounded-3xl border border-white/10 bg-slate-950/70 p-4">
+                    <div className="text-[10px] uppercase tracking-[0.35em] text-slate-500">{metric.label}</div>
+                    <div className="mt-2 text-3xl font-black text-white">{metric.value}</div>
+                    <div className="mt-4 h-2 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${metric.score}%`, background: metric.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* List Section */}
-        <div className="lg:col-span-4 glass-panel rounded-3xl border border-white/10 refracting-border-gradient flex flex-col">
-          <div className="p-8 border-b border-white/10 bg-white/5 flex justify-between items-center">
-            <h2 className="font-label-caps text-xs text-on-surface font-bold tracking-widest uppercase flex items-center gap-2">
-              <Hash size={14} className="text-primary-container" />
-              Latest Ingestions
-            </h2>
-            <Filter size={18} className="text-outline cursor-pointer hover:text-on-surface transition-colors" />
+        <aside className="space-y-6">
+          <div className="rounded-[2rem] border border-white/10 bg-surface-container/85 p-8 shadow-panel">
+            <div className="flex items-start justify-between gap-4 mb-8">
+              <div>
+                <div className="text-xs uppercase tracking-[0.35em] text-slate-500">Neural Health</div>
+                <h2 className="mt-3 text-3xl font-black text-white">System Overview</h2>
+              </div>
+              <ShieldCheck size={32} className="text-primary-container" />
+            </div>
+
+            <div className="space-y-5">
+              {metrics.map((metric) => (
+                <MetricBar key={metric.label} {...metric} />
+              ))}
+            </div>
+
+            <div className="mt-8 rounded-3xl border border-white/10 bg-slate-950/80 p-5">
+              <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-slate-500 mb-4">
+                <span>Active Vector Count</span>
+                <span className="text-white font-semibold">12,482</span>
+              </div>
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full rounded-full bg-primary-container" style={{ width: '82%' }} />
+              </div>
+              <div className="mt-4 text-[12px] text-slate-400">Live feed active across the secure stack. Threat saturation is currently contained within tolerances.</div>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-2 scrollbar-none">
-            {entries.map((entry, i) => (
-              <motion.div 
-                key={i}
-                whileHover={{ x: 6, backgroundColor: 'rgba(255,255,255,0.05)' }}
-                className="flex items-center justify-between p-4 rounded-2xl border border-transparent hover:border-white/10 transition-all cursor-pointer group"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden border border-white/10 relative">
-                    <img 
-                      src={entry.img} 
-                      className="w-full h-full object-cover transition-transform group-hover:scale-110" 
-                      referrerPolicy="no-referrer" 
-                    />
-                    <div className="absolute inset-0 bg-primary-container/20 mix-blend-overlay" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-black tracking-tighter text-on-surface group-hover:text-primary-container transition-colors">{entry.name}</span>
-                    <span className="text-[10px] text-outline font-label-caps uppercase tracking-widest">{entry.sector}</span>
-                  </div>
-                </div>
-                <div className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-label-caps tracking-widest uppercase border ${entry.color} bg-white/10`}>
-                  {entry.status}
-                </div>
-              </motion.div>
+          <div className="rounded-[2rem] border border-white/10 bg-slate-950/80 p-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-[0.35em] text-slate-500">Alerts</div>
+                <h3 className="text-xl font-black text-white">High Priority</h3>
+              </div>
+              <div className="rounded-full bg-primary-container/10 px-3 py-1 text-xs uppercase tracking-[0.35em] text-primary-container font-semibold">4 Active</div>
+            </div>
+            {summary.map((line, index) => (
+              <div key={index} className="flex items-start gap-3 text-sm text-slate-300">
+                <div className="mt-1 h-2 w-2 rounded-full bg-primary-container" />
+                <p>{line}</p>
+              </div>
             ))}
-          </div>
-
-          <div className="p-6 mt-auto">
-            <button className="w-full py-4 rounded-xl border border-white/10 font-label-caps text-[10px] text-outline tracking-widest uppercase hover:bg-white/5 hover:text-on-surface transition-all">
-              View All Observations
+            <button className="w-full py-3 rounded-2xl bg-white/5 text-[10px] uppercase tracking-[0.35em] text-slate-200 font-semibold hover:bg-white/10 transition">
+              Detailed Threat Log
             </button>
           </div>
-        </div>
-      </div>
+        </aside>
+      </section>
     </motion.div>
   );
 }

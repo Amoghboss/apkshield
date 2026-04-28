@@ -53,6 +53,12 @@
     from { transform: rotate(0deg) translateX(12px) rotate(0deg); }
     to { transform: rotate(360deg) translateX(12px) rotate(-360deg); }
   }
+
+  @keyframes radar-sweep {
+    0% { transform: rotate(0deg); opacity: 0.15; }
+    50% { opacity: 0.45; }
+    100% { transform: rotate(360deg); opacity: 0.15; }
+  }
 }
 
 @layer base {
@@ -135,5 +141,13 @@
   
   .glass-panel {
     @apply bg-white/5 backdrop-blur-[25px];
+  }
+
+  .shadow-panel {
+    box-shadow: 0 40px 120px rgba(0, 163, 255, 0.08);
+  }
+
+  .animate-radar-sweep {
+    animation: radar-sweep 6s linear infinite;
   }
 }

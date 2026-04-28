@@ -184,8 +184,8 @@ export default function Auth({ onAuthenticate }: AuthProps) {
                 <path d="M9 12l2 2 4-4" stroke="#00f5d4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">APK Guardian</h1>
-            <p className="text-xs text-slate-500 mt-1 tracking-wide">Mobile Threat Intelligence Platform</p>
+            <h1 className="text-2xl font-black tracking-tight text-white">AEGIS HUD</h1>
+            <p className="text-xs text-slate-500 mt-1 tracking-wide">Cybersecurity Command Center</p>
           </div>
 
           {/* tab toggle */}

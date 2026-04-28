@@ -3,12 +3,15 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-// Check if credentials are placeholder values
+// Check if credentials are placeholder values or invalid
 const isPlaceholder = 
   !supabaseUrl || 
   !supabaseAnonKey || 
   supabaseUrl.includes('YOUR_SUPABASE') || 
-  supabaseAnonKey.includes('YOUR_SUPABASE');
+  supabaseAnonKey.includes('YOUR_SUPABASE') ||
+  supabaseAnonKey.includes('YOUR_ACTUAL_ANON_KEY_HERE') ||
+  supabaseAnonKey === supabaseUrl || // Check if anon key is same as URL (your current issue)
+  !supabaseAnonKey.startsWith('eyJ'); // Anon keys should start with 'eyJ'
 
 let supabase: SupabaseClient;
 export let isSupabaseConfigured = false;
