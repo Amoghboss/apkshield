@@ -312,18 +312,42 @@ def build_summary(verdict, fraud_signals, findings, app_name):
 def build_risk_breakdown(findings):
     """Returns per-category risk scores for the radar/bar chart."""
     categories = {
-        "Privacy":    ["READ_SMS","RECEIVE_SMS","READ_CONTACTS","READ_CALL_LOG","READ_PHONE_STATE","READ_EXTERNAL_STORAGE","READ_MEDIA_IMAGES","READ_MEDIA_VIDEO","READ_CALENDAR","BODY_SENSORS"],
+        "Privacy":     ["READ_SMS","RECEIVE_SMS","READ_CONTACTS","READ_CALL_LOG","READ_PHONE_STATE","READ_EXTERNAL_STORAGE","READ_MEDIA_IMAGES","READ_MEDIA_VIDEO","READ_CALENDAR","BODY_SENSORS"],
         "Surveillance":["RECORD_AUDIO","CAMERA","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION"],
-        "Financial":  ["SEND_SMS","CALL_PHONE","NFC","USE_CREDENTIALS","GET_ACCOUNTS","MANAGE_ACCOUNTS"],
-        "Persistence":["RECEIVE_BOOT_COMPLETED","FOREGROUND_SERVICE","WAKE_LOCK","BIND_DEVICE_ADMIN"],
-        "Control":    ["REQUEST_INSTALL_PACKAGES","SYSTEM_ALERT_WINDOW","DISABLE_KEYGUARD","FACTORY_RESET","CHANGE_NETWORK_STATE","HIDE_OVERLAY_WINDOWS"],
+        "Financial":   ["SEND_SMS","CALL_PHONE","NFC","USE_CREDENTIALS","GET_ACCOUNTS","MANAGE_ACCOUNTS"],
+        "Persistence": ["RECEIVE_BOOT_COMPLETED","FOREGROUND_SERVICE","WAKE_LOCK","BIND_DEVICE_ADMIN"],
+        "Control":     ["REQUEST_INSTALL_PACKAGES","SYSTEM_ALERT_WINDOW","DISABLE_KEYGUARD","FACTORY_RESET","CHANGE_NETWORK_STATE","HIDE_OVERLAY_WINDOWS"],
     }
-    perm_names = {f["permission"] for f in findings}
     result = {}
     for cat, perms in categories.items():
         score = sum(f["score"] for f in findings if f["permission"] in perms)
         result[cat] = min(score, 10)
     return result
+
+def build_score_breakdown(findings, fraud_signals, cert_info, components):
+    """Breakdown expected by the frontend ResultReport component."""
+    perm_score  = sum(f["score"] for f in findings)
+    combo_score = sum(2 for s in fraud_signals if s["type"] == "DANGEROUS_COMBO")
+    fraud_score = sum(2 for s in fraud_signals if s["type"] in ("IMPERSONATION","SUSPICIOUS_NAME","UNKNOWN_DEVELOPER"))
+    cert_score  = (3 if cert_info.get("self_signed") else 0) + (2 if cert_info.get("valid_to") and _cert_expired(cert_info["valid_to"]) else 0)
+    total_comp  = sum(components.values())
+    struct_score = 2 if total_comp > 50 else (1 if total_comp > 20 else 0)
+    return {
+        "permission_score":  min(perm_score, 20),
+        "combo_score":       min(combo_score, 10),
+        "fraud_score":       min(fraud_score, 10),
+        "certificate_score": min(cert_score, 5),
+        "structure_score":   min(struct_score, 5),
+    }
+
+def _cert_expired(valid_to_str):
+    from datetime import datetime, timezone
+    try:
+        exp = datetime.strptime(valid_to_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        from datetime import datetime as dt
+        return exp < dt.now(timezone.utc)
+    except Exception:
+        return False
 
 # ─── WEBSOCKET ────────────────────────────────────────────────────────────────
 @app.websocket("/ws/{client_id}")
@@ -479,6 +503,15 @@ async def scan_url(req: URLScanRequest):
 
     asyncio.create_task(download_and_scan())
     return {"status": "started"}
+
+@app.get("/")
+async def root():
+    return {
+        "message": "APK Guardian API", 
+        "version": "3.0.0",
+        "frontend_url": "http://localhost:3001",
+        "docs": "/docs"
+    }
 
 @app.get("/api/health")
 @app.get("/health")
